@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Letter Recognition</title>
+
+<style>
+body {
+    margin: 0;
+    display: flex;
+    height: 100vh;
+    background: #111;
+    color: white;
+    font-family: Arial;
+}
+
+#left {
+    width: 80%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+canvas {
+    background: white;
+    border: 2px solid #333;
+    cursor: crosshair;
+}
+
+#right {
+    width: 20%;
+    padding: 20px;
+    background: #222;
+}
+
+.bar {
+    height: 20px;
+    background: #444;
+    margin: 5px 0;
+}
+
+.fill {
+    height: 100%;
+    background: #4caf50;
+}
+
+button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="left">
+    <canvas id="canvas"></canvas>
+</div>
+
+<div id="right">
+    <h2>Prediction</h2>
+    <h1 id="result">-</h1>
+
+    <h3>Top 5</h3>
+    <div id="top5"></div>
+
+    <button id="predict">Predict</button>
+    <button id="clear">Clear</button>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+// фикс размера
+const size = 500;
+canvas.width = size;
+canvas.height = size;
+
+// фон белый (важно!)
+ctx.fillStyle = "white";
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+let drawing = false;
+
+// события
+canvas.addEventListener("mousedown", (e) => {
+    drawing = true;
+    ctx.beginPath();
+});
+
+canvas.addEventListener("mouseup", () => {
+    drawing = false;
+    ctx.beginPath();
+});
+
+canvas.addEventListener("mouseleave", () => {
+    drawing = false;
+    ctx.beginPath();
+});
+
+canvas.addEventListener("mousemove", (e) => {
+    if (!drawing) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    ctx.lineWidth = 50;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "black";
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+});
+
+// CLEAR
+document.getElementById("clear").onclick = () => {
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    document.getElementById("result").innerText = "-";
+    document.getElementById("top5").innerHTML = "";
+};
+
+// PREDICT
+document.getElementById("predict").onclick = async () => {
+    try {
+        const image = canvas.toDataURL("image/png");
+
+        const res = await fetch("/predict", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ image })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            alert(data.detail || `Ошибка ${res.status}`);
+            return;
+        }
+
+        document.getElementById("result").innerText = data.prediction;
+
+        const top5Div = document.getElementById("top5");
+        top5Div.innerHTML = "";
+
+        data.top5.forEach(item => {
+            const row = document.createElement("div");
+
+            const label = document.createElement("div");
+            label.innerText = `${item.letter} (${(item.prob * 100).toFixed(1)}%)`;
+
+            const bar = document.createElement("div");
+            bar.className = "bar";
+
+            const fill = document.createElement("div");
+            fill.className = "fill";
+            fill.style.width = (item.prob * 100) + "%";
+
+            bar.appendChild(fill);
+
+            row.appendChild(label);
+            row.appendChild(bar);
+
+            top5Div.appendChild(row);
+        });
+
+    } catch (e) {
+        console.error(e);
+        alert("Ошибка запроса к серверу. Убедитесь, что сервер запущен на порту 8000.");
+    }
+};
+</script>
+
+</body>
+</html>
