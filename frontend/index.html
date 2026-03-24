@@ -261,37 +261,6 @@
             transform: none;
         }
 
-        /* API input */
-        .api-box {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            padding: 9px 12px;
-        }
-
-        .api-box label {
-            font-size: 10px;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            white-space: nowrap;
-        }
-
-        .api-box input {
-            flex: 1;
-            background: none;
-            border: none;
-            outline: none;
-            font-family: 'DM Mono', monospace;
-            font-size: 11px;
-            color: var(--text-mid);
-            min-width: 0;
-        }
-
         /* Status */
         .status-bar {
             font-size: 11px;
@@ -674,11 +643,6 @@
             <div class="btn-row">
                 <button class="btn btn-clear" id="clearBtn">Очистить</button>
                 <button class="btn btn-go" id="predictBtn">Распознать →</button>
-            </div>
-
-            <div class="api-box">
-                <label>API</label>
-                <input type="text" id="apiUrl" value="http://localhost:8000/predict/image"/>
             </div>
 
             <div class="status-bar" id="statusBar">Нарисуй букву и нажми «Распознать»</div>
