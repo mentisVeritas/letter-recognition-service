@@ -27,31 +27,35 @@ model = load_model(MODEL_PATH, device)
 LABELS = [chr(ord('A') + i) for i in range(26)]
 
 
-# ── Inference ────────────────────────────────────────────────────────────────
-def run_inference(tensor: torch.Tensor) -> PredictResponse:
+# ─────────────────────────────────────────────
+# Базовый инференс
+# ─────────────────────────────────────────────
+def infer_tensor(tensor: torch.Tensor):
     with torch.no_grad():
         logits = model(tensor.to(device))
-
-        # ↓ уменьшаем "самоуверенность"
-        probs = F.softmax(logits / 2.0, dim=1).cpu().numpy()[0]
-
-        idx = int(probs.argmax())
-        confidence = float(probs[idx])
-
-    return PredictResponse(
-        predicted_letter=LABELS[idx],
-        predicted_index=idx,
-        confidence=confidence,
-        probabilities={l: float(p) for l, p in zip(LABELS, probs)},
-    )
+        probs = F.softmax(logits, dim=1).cpu().numpy()[0]
+    return probs
 
 
-# ── Rotation ensemble ────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# Rotation + best selection
+# ─────────────────────────────────────────────
 def predict_with_rotations(img: Image.Image) -> PredictResponse:
     angles = [0, 45, 90, 135, 180, 225, 270, 315]
 
-    best_result = None
-    best_conf = -1
+    weights = {
+        0: 1.0,
+        45: 0.8,
+        90: 0.3,
+        135: 0.2,
+        180: 0.1,
+        225: 0.2,
+        270: 0.3,
+        315: 0.8,
+    }
+
+    best_probs = None
+    best_score = -1
 
     for angle in angles:
         rotated = img.rotate(angle, fillcolor=255)
@@ -59,20 +63,34 @@ def predict_with_rotations(img: Image.Image) -> PredictResponse:
         X = 1.0 - (np.array(rotated, dtype=np.float32) / 255.0)
         tensor = torch.tensor(X).reshape(1, 1, 28, 28)
 
-        result = run_inference(tensor)
+        probs = infer_tensor(tensor)
 
-        if result.confidence > best_conf:
-            best_conf = result.confidence
-            best_result = result
+        score = probs.max() * weights[angle]
 
-    # threshold (если не уверен)
-    if best_result.confidence < 0.85:
-        best_result.predicted_letter = "?"
+        if score > best_score:
+            best_score = score
+            best_probs = probs
 
-    return best_result
+    idx = int(best_probs.argmax())
+    confidence = float(best_probs[idx])
+
+    result = PredictResponse(
+        predicted_letter=LABELS[idx],
+        predicted_index=idx,
+        confidence=confidence,
+        probabilities={l: float(p) for l, p in zip(LABELS, best_probs)},
+    )
+
+    # защита от переуверенности
+    if confidence < 0.6:
+        result.predicted_letter = "?"
+
+    return result
 
 
-# ── Health ───────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# API
+# ─────────────────────────────────────────────
 @app.get("/health", response_model=HealthResponse)
 def health():
     return HealthResponse(
@@ -83,7 +101,6 @@ def health():
     )
 
 
-# ── Predict array ────────────────────────────────────────────────────────────
 @app.post("/predict", response_model=PredictResponse)
 def predict_array(body: ArrayRequest):
     if len(body.pixels) != 784:
@@ -91,10 +108,19 @@ def predict_array(body: ArrayRequest):
 
     X = np.array(body.pixels, dtype=np.float32) / 255.0
     tensor = torch.tensor(X).reshape(1, 1, 28, 28)
-    return run_inference(tensor)
+
+    probs = infer_tensor(tensor)
+
+    idx = int(probs.argmax())
+
+    return PredictResponse(
+        predicted_letter=LABELS[idx],
+        predicted_index=idx,
+        confidence=float(probs[idx]),
+        probabilities={l: float(p) for l, p in zip(LABELS, probs)},
+    )
 
 
-# ── Predict image ────────────────────────────────────────────────────────────
 @app.post("/predict/image", response_model=PredictResponse)
 async def predict_image(file: UploadFile = File(...)):
     contents = await file.read()
@@ -108,5 +134,7 @@ async def predict_image(file: UploadFile = File(...)):
     return predict_with_rotations(img)
 
 
-# ── Frontend ─────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# Frontend
+# ─────────────────────────────────────────────
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
