@@ -1,13 +1,20 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict
 
-class PredictRequest(BaseModel):
-    image: str  # base64
 
-class TopItem(BaseModel):
-    letter: str
-    prob: float
+class ArrayRequest(BaseModel):
+    pixels: List[float]
+
 
 class PredictResponse(BaseModel):
-    prediction: str
-    top5: List[TopItem]
+    predicted_letter: str
+    predicted_index: int
+    confidence: float
+    probabilities: Dict[str, float]
+
+
+class HealthResponse(BaseModel):
+    status: str
+    device: str
+    classes: List[str]
+    model_path: str

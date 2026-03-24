@@ -1,183 +1,967 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Letter Recognition</title>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Letter·AI — Распознавание букв</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Unbounded:wght@700;900&display=swap"
+          rel="stylesheet"/>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-<style>
-body {
-    margin: 0;
-    display: flex;
-    height: 100vh;
-    background: #111;
-    color: white;
-    font-family: Arial;
-}
+        :root {
+            --bg: #080810;
+            --surface: #0f0f1a;
+            --surface2: #141424;
+            --border: #1c1c30;
+            --border2: #252540;
+            --accent: #c8f135;
+            --accent2: #3df5c1;
+            --accent-dim: rgba(200, 241, 53, 0.08);
+            --muted: #30304a;
+            --text: #e2e2f0;
+            --text-dim: #5a5a7a;
+            --text-mid: #9090b0;
+            --red: #f56565;
+            --radius: 18px;
+            --radius-sm: 10px;
+        }
 
-#left {
-    width: 80%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
+        html {
+            scroll-behavior: smooth;
+        }
 
-canvas {
-    background: white;
-    border: 2px solid #333;
-    cursor: crosshair;
-}
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Mono', monospace;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px 16px;
+        }
 
-#right {
-    width: 20%;
-    padding: 20px;
-    background: #222;
-}
+        /* Ambient background blobs */
+        .bg-blob {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+        }
 
-.bar {
-    height: 20px;
-    background: #444;
-    margin: 5px 0;
-}
+        .bg-blob-1 {
+            width: 500px;
+            height: 500px;
+            top: -150px;
+            left: 50%;
+            transform: translateX(-60%);
+            background: radial-gradient(circle, rgba(200, 241, 53, 0.04) 0%, transparent 70%);
+        }
 
-.fill {
-    height: 100%;
-    background: #4caf50;
-}
+        .bg-blob-2 {
+            width: 400px;
+            height: 400px;
+            bottom: -100px;
+            right: -100px;
+            background: radial-gradient(circle, rgba(61, 245, 193, 0.04) 0%, transparent 70%);
+        }
 
-button {
-    width: 100%;
-    padding: 10px;
-    margin-top: 10px;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
-}
-</style>
+        .page-wrap {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        /* ── Header ── */
+        header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            animation: fadeDown 0.6s ease both;
+        }
+
+        .logo-wrap {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: grid;
+            place-items: center;
+            font-family: 'Unbounded', sans-serif;
+            font-size: 18px;
+            font-weight: 900;
+            color: #080810;
+        }
+
+        .logo-text {
+            font-family: 'Unbounded', sans-serif;
+            font-size: clamp(22px, 4vw, 36px);
+            font-weight: 900;
+            letter-spacing: -1px;
+            background: linear-gradient(135deg, var(--accent) 30%, var(--accent2) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--text-dim);
+            font-size: 12px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        /* ── Main card ── */
+        .main-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 36px;
+            align-items: start;
+            animation: fadeUp 0.6s 0.1s ease both;
+        }
+
+        /* ── Left column ── */
+        .left-col {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .section-label {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            align-self: flex-start;
+        }
+
+        /* Canvas */
+        .canvas-frame {
+            position: relative;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 0 0 1.5px var(--border2);
+            transition: box-shadow 0.25s;
+            cursor: crosshair;
+        }
+
+        .canvas-frame.active {
+            box-shadow: 0 0 0 2px var(--accent), 0 0 32px rgba(200, 241, 53, 0.14);
+        }
+
+        #drawCanvas {
+            display: block;
+            background: #fff;
+            touch-action: none;
+            width: 280px;
+            height: 280px;
+        }
+
+        /* Brush */
+        .brush-row {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brush-row label {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            white-space: nowrap;
+        }
+
+        input[type=range] {
+            flex: 1;
+            height: 4px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .brush-num {
+            font-size: 12px;
+            color: var(--accent);
+            width: 20px;
+            text-align: right;
+        }
+
+        /* Buttons */
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 14px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: 'DM Mono', monospace;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.18s;
+            letter-spacing: 0.03em;
+        }
+
+        .btn-clear {
+            background: var(--surface2);
+            color: var(--text-mid);
+            border: 1px solid var(--border2);
+        }
+
+        .btn-clear:hover {
+            background: var(--muted);
+            color: var(--text);
+        }
+
+        .btn-go {
+            background: var(--accent);
+            color: #080810;
+            font-weight: 500;
+        }
+
+        .btn-go:hover {
+            background: #d4ff45;
+            box-shadow: 0 0 24px rgba(200, 241, 53, 0.28);
+        }
+
+        .btn-go:active {
+            transform: scale(0.97);
+        }
+
+        .btn-go:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* API input */
+        .api-box {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 9px 12px;
+        }
+
+        .api-box label {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            white-space: nowrap;
+        }
+
+        .api-box input {
+            flex: 1;
+            background: none;
+            border: none;
+            outline: none;
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            color: var(--text-mid);
+            min-width: 0;
+        }
+
+        /* Status */
+        .status-bar {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-align: center;
+            min-height: 16px;
+            letter-spacing: 0.05em;
+        }
+
+        .status-bar.loading {
+            color: var(--accent2);
+        }
+
+        .status-bar.error {
+            color: var(--red);
+        }
+
+        .status-bar.ok {
+            color: var(--accent);
+        }
+
+        /* ── Right column ── */
+        .right-col {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 0;
+        }
+
+        /* Big result box */
+        .result-box {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 28px 24px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            min-height: 120px;
+        }
+
+        .result-box.has-result {
+            border-color: rgba(200, 241, 53, 0.3);
+            box-shadow: 0 0 40px rgba(200, 241, 53, 0.06);
+        }
+
+        .big-letter {
+            font-family: 'Unbounded', sans-serif;
+            font-size: 80px;
+            font-weight: 900;
+            line-height: 1;
+            flex-shrink: 0;
+            width: 90px;
+            text-align: center;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            transition: all 0.3s;
+        }
+
+        .big-letter.empty {
+            font-size: 60px;
+            background: none;
+            -webkit-text-fill-color: var(--muted);
+        }
+
+        .result-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .result-meta-label {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .result-name {
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .confidence-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--accent-dim);
+            border: 1px solid rgba(200, 241, 53, 0.2);
+            border-radius: 20px;
+            padding: 5px 14px;
+            font-size: 13px;
+            color: var(--accent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .confidence-pill.visible {
+            opacity: 1;
+        }
+
+        .conf-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: pulse 1.4s ease infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.5;
+                transform: scale(0.8);
+            }
+        }
+
+        /* Probability bars */
+        .probs-box {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .probs-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .probs-title {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .probs-hint {
+            font-size: 10px;
+            color: var(--muted);
+            font-style: italic;
+        }
+
+        .prob-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+        }
+
+        .prob-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            opacity: 0;
+            transform: translateX(-8px);
+            transition: opacity 0.35s, transform 0.35s;
+        }
+
+        .prob-row.show {
+            opacity: 1;
+            transform: none;
+        }
+
+        .prob-ltr {
+            width: 18px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text);
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .prob-track {
+            flex: 1;
+            height: 7px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .prob-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: var(--muted);
+            width: 0%;
+            transition: width 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .prob-fill.top {
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+        }
+
+        .prob-pct {
+            width: 44px;
+            font-size: 11px;
+            color: var(--text-dim);
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .prob-pct.top {
+            color: var(--accent);
+        }
+
+        /* Empty state */
+        .empty-hint {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 20px;
+            color: var(--text-dim);
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .empty-hint svg {
+            opacity: 0.3;
+        }
+
+        /* History strip */
+        .history-box {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .history-title {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .history-strip {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .history-chip {
+            background: var(--surface);
+            border: 1px solid var(--border2);
+            border-radius: 8px;
+            padding: 5px 12px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            animation: popIn 0.25s ease both;
+        }
+
+        .history-chip .chip-conf {
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        @keyframes popIn {
+            from {
+                opacity: 0;
+                transform: scale(0.85);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .history-empty {
+            font-size: 11px;
+            color: var(--muted);
+            font-style: italic;
+        }
+
+        /* Spinner */
+        .spinner {
+            display: inline-block;
+            width: 11px;
+            height: 11px;
+            border: 2px solid var(--accent2);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.65s linear infinite;
+            vertical-align: middle;
+            margin-right: 5px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeDown {
+            from {
+                opacity: 0;
+                transform: translateY(-14px);
+            }
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(18px);
+            }
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .main-card {
+                grid-template-columns: 1fr;
+                justify-items: center;
+            }
+
+            .left-col {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
-
 <body>
 
-<div id="left">
-    <canvas id="canvas"></canvas>
-</div>
+<div class="bg-blob bg-blob-1"></div>
+<div class="bg-blob bg-blob-2"></div>
 
-<div id="right">
-    <h2>Prediction</h2>
-    <h1 id="result">-</h1>
+<div class="page-wrap">
 
-    <h3>Top 5</h3>
-    <div id="top5"></div>
+    <!-- Header -->
+    <header>
+        <div class="logo-wrap">
+            <div class="logo-icon">L</div>
+            <div class="logo-text">Letter·AI</div>
+        </div>
+        <div class="subtitle">Нарисуй букву — нейросеть распознает · A–Z</div>
+    </header>
 
-    <button id="predict">Predict</button>
-    <button id="clear">Clear</button>
+    <!-- Main card -->
+    <div class="main-card">
+
+        <!-- LEFT: Canvas -->
+        <div class="left-col">
+            <span class="section-label">Доска для рисования</span>
+
+            <div class="canvas-frame" id="canvasFrame">
+                <canvas id="drawCanvas" width="280" height="280"></canvas>
+            </div>
+
+            <div class="brush-row">
+                <label>Кисть</label>
+                <input type="range" id="brushSize" min="15" max="45" value="30"/>
+                <span class="brush-num" id="brushNum">20</span>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn btn-clear" id="clearBtn">Очистить</button>
+                <button class="btn btn-go" id="predictBtn">Распознать →</button>
+            </div>
+
+            <div class="api-box">
+                <label>API</label>
+                <input type="text" id="apiUrl" value="http://localhost:8000/predict/image"/>
+            </div>
+
+            <div class="status-bar" id="statusBar">Нарисуй букву и нажми «Распознать»</div>
+        </div>
+
+        <!-- RIGHT: Results -->
+        <div class="right-col">
+
+            <!-- Big result -->
+            <div class="result-box" id="resultBox">
+                <div class="big-letter empty" id="bigLetter">?</div>
+                <div class="result-meta">
+                    <div class="result-meta-label">Распознанная буква</div>
+                    <div class="result-name" id="resultName">—</div>
+                    <div class="confidence-pill" id="confPill">
+                        <div class="conf-dot"></div>
+                        <span id="confText">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Probability bars -->
+            <div class="probs-box">
+                <div class="probs-header">
+                    <span class="probs-title">Топ-5 вероятностей</span>
+                    <span class="probs-hint" id="probsHint">ожидаем результат...</span>
+                </div>
+                <div class="prob-rows" id="probRows">
+                    <div class="empty-hint">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="1.5">
+                            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/>
+                        </svg>
+                        Нарисуй букву чтобы увидеть вероятности
+                    </div>
+                </div>
+            </div>
+
+            <!-- History -->
+            <div class="history-box">
+                <div class="history-title">История распознаваний</div>
+                <div class="history-strip" id="historyStrip">
+                    <span class="history-empty">пусто</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
 </div>
 
 <script>
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
+    // ── Canvas ───────────────────────────────────────────────────────────────────
+    const canvas = document.getElementById('drawCanvas');
+    const ctx = canvas.getContext('2d');
+    const frame = document.getElementById('canvasFrame');
 
-// фикс размера
-const size = 500;
-canvas.width = size;
-canvas.height = size;
+    // Init white background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 280, 280);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#111';
 
-// фон белый (важно!)
-ctx.fillStyle = "white";
-ctx.fillRect(0, 0, canvas.width, canvas.height);
+    let isDrawing = false, lx = 0, ly = 0, hasMark = false;
 
-let drawing = false;
+    function pos(e) {
+        const r = canvas.getBoundingClientRect();
+        const sx = canvas.width / r.width;
+        const sy = canvas.height / r.height;
+        const src = e.touches ? e.touches[0] : e;
+        return {x: (src.clientX - r.left) * sx, y: (src.clientY - r.top) * sy};
+    }
 
-// события
-canvas.addEventListener("mousedown", (e) => {
-    drawing = true;
-    ctx.beginPath();
-});
+    function startDraw(e) {
+        e.preventDefault();
+        isDrawing = true;
+        hasMark = true;
+        frame.classList.add('active');
+        const p = pos(e);
+        lx = p.x;
+        ly = p.y;
+        ctx.beginPath();
+        ctx.arc(lx, ly, ctx.lineWidth / 2, 0, Math.PI * 2);
+        ctx.fillStyle = '#111';
+        ctx.fill();
+    }
 
-canvas.addEventListener("mouseup", () => {
-    drawing = false;
-    ctx.beginPath();
-});
+    function draw(e) {
+        if (!isDrawing) return;
+        e.preventDefault();
+        const p = pos(e);
+        ctx.beginPath();
+        ctx.moveTo(lx, ly);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        lx = p.x;
+        ly = p.y;
+    }
 
-canvas.addEventListener("mouseleave", () => {
-    drawing = false;
-    ctx.beginPath();
-});
+    function stopDraw() {
+        isDrawing = false;
+        frame.classList.remove('active');
+    }
 
-canvas.addEventListener("mousemove", (e) => {
-    if (!drawing) return;
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDraw);
+    canvas.addEventListener('mouseleave', stopDraw);
+    canvas.addEventListener('touchstart', startDraw, {passive: false});
+    canvas.addEventListener('touchmove', draw, {passive: false});
+    canvas.addEventListener('touchend', stopDraw);
 
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    // ── Brush ────────────────────────────────────────────────────────────────────
+    const brushSlider = document.getElementById('brushSize');
+    const brushNum = document.getElementById('brushNum');
 
-    ctx.lineWidth = 50;
-    ctx.lineCap = "round";
-    ctx.strokeStyle = "black";
+    ctx.lineWidth = +brushSlider.value;
+    brushNum.textContent = brushSlider.value;
 
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-});
+    brushSlider.addEventListener('input', () => {
+        ctx.lineWidth = +brushSlider.value;
+        brushNum.textContent = brushSlider.value;
+    });
 
-// CLEAR
-document.getElementById("clear").onclick = () => {
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // ── Clear ────────────────────────────────────────────────────────────────────
+    document.getElementById('clearBtn').addEventListener('click', () => {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, 280, 280);
+        hasMark = false;
+        resetResult();
+        setStatus('Доска очищена', 'ok');
+        setTimeout(() => setStatus('Нарисуй букву и нажми «Распознать»', ''), 1500);
+    });
 
-    document.getElementById("result").innerText = "-";
-    document.getElementById("top5").innerHTML = "";
-};
+    // ── Predict ──────────────────────────────────────────────────────────────────
+    const predictBtn = document.getElementById('predictBtn');
+    predictBtn.addEventListener('click', predict);
 
-// PREDICT
-document.getElementById("predict").onclick = async () => {
-    try {
-        const image = canvas.toDataURL("image/png");
-
-        const res = await fetch("/predict", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ image })
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-            alert(data.detail || `Ошибка ${res.status}`);
+    async function predict() {
+        if (!hasMark) {
+            setStatus('Сначала нарисуй букву!', 'error');
             return;
         }
 
-        document.getElementById("result").innerText = data.prediction;
+        const apiUrl = document.getElementById('apiUrl').value.trim();
+        predictBtn.disabled = true;
+        setStatus('<span class="spinner"></span>Распознаю...', 'loading');
 
-        const top5Div = document.getElementById("top5");
-        top5Div.innerHTML = "";
+        canvas.toBlob(async (blob) => {
+            const fd = new FormData();
+            fd.append('file', blob, 'letter.png');
 
-        data.top5.forEach(item => {
-            const row = document.createElement("div");
-
-            const label = document.createElement("div");
-            label.innerText = `${item.letter} (${(item.prob * 100).toFixed(1)}%)`;
-
-            const bar = document.createElement("div");
-            bar.className = "bar";
-
-            const fill = document.createElement("div");
-            fill.className = "fill";
-            fill.style.width = (item.prob * 100) + "%";
-
-            bar.appendChild(fill);
-
-            row.appendChild(label);
-            row.appendChild(bar);
-
-            top5Div.appendChild(row);
-        });
-
-    } catch (e) {
-        console.error(e);
-        alert("Ошибка запроса к серверу. Убедитесь, что сервер запущен на порту 8000.");
+            try {
+                const res = await fetch(apiUrl, {method: 'POST', body: fd});
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || `HTTP ${res.status}`);
+                }
+                const data = await res.json();
+                showResult(data);
+                addHistory(data.predicted_letter, data.confidence);
+                setStatus('Готово!', 'ok');
+                setTimeout(() => setStatus('', ''), 2000);
+            } catch (err) {
+                setStatus(`Ошибка: ${err.message}`, 'error');
+            } finally {
+                predictBtn.disabled = false;
+            }
+        }, 'image/png');
     }
-};
-</script>
 
+    // ── Show result ───────────────────────────────────────────────────────────────
+    const LETTER_NAMES = {
+        A: 'Alpha', B: 'Bravo', C: 'Charlie', D: 'Delta', E: 'Echo', F: 'Foxtrot',
+        G: 'Golf', H: 'Hotel', I: 'India', J: 'Juliet', K: 'Kilo', L: 'Lima',
+        M: 'Mike', N: 'November', O: 'Oscar', P: 'Papa', Q: 'Quebec', R: 'Romeo',
+        S: 'Sierra', T: 'Tango', U: 'Uniform', V: 'Victor', W: 'Whiskey', X: 'X-ray',
+        Y: 'Yankee', Z: 'Zulu'
+    };
+
+    function showResult(data) {
+        const {predicted_letter: letter, confidence, probabilities: probs} = data;
+
+        // Big letter
+        const bigLetter = document.getElementById('bigLetter');
+        bigLetter.textContent = letter;
+        bigLetter.classList.remove('empty');
+
+        // Name
+        document.getElementById('resultName').textContent =
+            LETTER_NAMES[letter] || letter;
+
+        // Confidence pill
+        const pill = document.getElementById('confPill');
+        document.getElementById('confText').textContent =
+            `${(confidence * 100).toFixed(1)}% уверенность`;
+        pill.classList.add('visible');
+
+        document.getElementById('resultBox').classList.add('has-result');
+
+        // Top-5 bars
+        const sorted = Object.entries(probs)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+
+        document.getElementById('probsHint').textContent =
+            `модель выбрала ${letter}`;
+
+        const rows = document.getElementById('probRows');
+        rows.innerHTML = '';
+
+        sorted.forEach(([ltr, prob], i) => {
+            const isTop = i === 0;
+            const pct = (prob * 100).toFixed(1);
+
+            const row = document.createElement('div');
+            row.className = 'prob-row';
+            row.innerHTML = `
+        <span class="prob-ltr">${ltr}</span>
+        <div class="prob-track">
+          <div class="prob-fill ${isTop ? 'top' : ''}" id="fill-${ltr}"></div>
+        </div>
+        <span class="prob-pct ${isTop ? 'top' : ''}">${pct}%</span>
+      `;
+            rows.appendChild(row);
+
+            setTimeout(() => {
+                row.classList.add('show');
+                document.getElementById(`fill-${ltr}`).style.width = pct + '%';
+            }, i * 90);
+        });
+    }
+
+    function resetResult() {
+        const bigLetter = document.getElementById('bigLetter');
+        bigLetter.textContent = '?';
+        bigLetter.classList.add('empty');
+        document.getElementById('resultName').textContent = '—';
+        document.getElementById('confPill').classList.remove('visible');
+        document.getElementById('resultBox').classList.remove('has-result');
+        document.getElementById('probsHint').textContent = 'ожидаем результат...';
+        document.getElementById('probRows').innerHTML = `
+      <div class="empty-hint">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/>
+        </svg>
+        Нарисуй букву чтобы увидеть вероятности
+      </div>
+    `;
+    }
+
+    // ── History ───────────────────────────────────────────────────────────────────
+    const history = [];
+
+    function addHistory(letter, confidence) {
+        history.unshift({letter, confidence});
+        if (history.length > 12) history.pop();
+
+        const strip = document.getElementById('historyStrip');
+        strip.innerHTML = '';
+
+        history.forEach(({letter: l, confidence: c}) => {
+            const chip = document.createElement('div');
+            chip.className = 'history-chip';
+            chip.innerHTML = `${l}<span class="chip-conf">${(c * 100).toFixed(0)}%</span>`;
+            strip.appendChild(chip);
+        });
+    }
+
+    // ── Status ────────────────────────────────────────────────────────────────────
+    function setStatus(html, cls) {
+        const el = document.getElementById('statusBar');
+        el.innerHTML = html;
+        el.className = 'status-bar ' + (cls || '');
+    }
+
+    // ── Keyboard shortcut: Enter = predict ───────────────────────────────────────
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') predict();
+        if (e.key === 'Escape' || e.key === 'Delete') {
+            document.getElementById('clearBtn').click();
+        }
+    });
+</script>
 </body>
 </html>
