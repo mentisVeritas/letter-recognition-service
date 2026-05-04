@@ -13,23 +13,29 @@ https://letter-recognition-service.onrender.com/
 
 ## Структура проекта
 
+```
 letter-recognition-service/
 ├── app/
-│ ├── main.py # FastAPI — роуты, инференс, статика
-│ ├── model.py # Загрузка модели
-│ ├── schemas.py # Pydantic схемы
-│ └── utils.py # Утилиты предобработки
+│   ├── main.py
+│   ├── model.py
+│   ├── schemas.py
+│   └── utils.py
+│
 ├── frontend/
-│ └── index.html # Веб-интерфейс с canvas-доской
+│   └── index.html
+│
 ├── model/
-│ └── letter_cnn.pth # Сериализованная CNN модель
+│   └── letter_cnn.pth
+│
 ├── notebooks/
-│ └── train.ipynb # Обучение модели
-├── requirements.txt # Локальные зависимости
-├── requirements-docker.txt # CPU-only torch для Docker
+│   └── train.ipynb
+│
+├── requirements.txt
+├── requirements-docker.txt
 ├── Dockerfile
 ├── docker-compose.yml
 └── README.md
+```
 
 ---
 
