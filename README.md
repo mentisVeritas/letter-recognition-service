@@ -4,27 +4,16 @@ CNN-модель для классификации рукописных букв
 
 ---
 
+## Демо
+
+Продовая версия доступна здесь:  
+https://letter-recognition-service.onrender.com/
+
+---
+
 ## Структура проекта
 
-```
-letter-recognition-service/
-├── app/
-│   ├── main.py        # FastAPI — роуты, инференс, статика
-│   ├── model.py       # Загрузка модели
-│   ├── schemas.py     # Pydantic схемы
-│   └── utils.py       # Утилиты предобработки
-├── frontend/
-│   └── index.html     # Веб-интерфейс с canvas-доской
-├── model/
-│   └── letter_cnn.pth # Сериализованная CNN модель
-├── notebooks/
-│   └── train.ipynb    # Обучение модели
-├── requirements.txt        # Локальные зависимости
-├── requirements-docker.txt # CPU-only torch для Docker
-├── Dockerfile
-├── docker-compose.yml
-└── README.md
-```
+letter-recognition-service/ ├── app/ │   ├── main.py        # FastAPI — роуты, инференс, статика │   ├── model.py       # Загрузка модели │   ├── schemas.py     # Pydantic схемы │   └── utils.py       # Утилиты предобработки ├── frontend/ │   └── index.html     # Веб-интерфейс с canvas-доской ├── model/ │   └── letter_cnn.pth # Сериализованная CNN модель ├── notebooks/ │   └── train.ipynb    # Обучение модели ├── requirements.txt        # Локальные зависимости ├── requirements-docker.txt # CPU-only torch для Docker ├── Dockerfile ├── docker-compose.yml └── README.md
 
 ---
 
@@ -40,107 +29,98 @@ letter-recognition-service/
 
 ### Архитектура
 
-```
-Input: 1×28×28
-  Conv2d(1→32) + ReLU + MaxPool  →  32×14×14
-  Conv2d(32→64) + ReLU + MaxPool →  64×7×7
-  Conv2d(64→128) + ReLU          → 128×7×7
-  Flatten
-  Linear(6272→256) + ReLU + Dropout(0.5)
-  Linear(256→26)
-Output: 26 классов
-```
+Input: 1×28×28   Conv2d(1→32) + ReLU + MaxPool  →  32×14×14   Conv2d(32→64) + ReLU + MaxPool →  64×7×7   Conv2d(64→128) + ReLU          → 128×7×7   Flatten   Linear(6272→256) + ReLU + Dropout(0.5)   Linear(256→26) Output: 26 классов
 
 ---
 
 ## API
 
 ### GET /health
-```json
-{
-  "status": "ok",
-  "device": "cpu",
-  "classes": ["A", "B", ..., "Z"],
-  "model_path": "model/letter_cnn.pth"
-}
-```
+
+https://letter-recognition-service.onrender.com/health
+
+Ответ:
+json {   "status": "ok",   "device": "cpu",   "classes": ["A", "B", "...", "Z"],   "model_path": "model/letter_cnn.pth" } 
+
+---
 
 ### POST /predict
-Принимает 784 пикселя (0–255):
-```json
-{ "pixels": [0.0, 255.0, ...] }
-```
+
+https://letter-recognition-service.onrender.com/predict
+
+Тело запроса:
+json { "pixels": [0.0, 255.0, ...] } 
+
+---
 
 ### POST /predict/image
-Принимает PNG/JPG файл через multipart/form-data.
 
-**Ответ обоих эндпоинтов:**
-```json
-{
-  "predicted_letter": "A",
-  "predicted_index": 0,
-  "confidence": 0.9821,
-  "probabilities": { "A": 0.9821, "B": 0.003, ... }
-}
-```
+https://letter-recognition-service.onrender.com/predict/image
+
+Принимает PNG/JPG через multipart/form-data
 
 ---
 
-## Запуск локально
+### Ответ
 
-```bash
-# Установить зависимости
-pip install -r requirements.txt
-
-# Запустить сервер
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Открыть: http://localhost:8000
+json {   "predicted_letter": "A",   "predicted_index": 0,   "confidence": 0.9821,   "probabilities": { "A": 0.9821, "B": 0.003 } } 
 
 ---
 
-## Запуск через Docker
+## Запуск локально (DEV)
 
-```bash
-docker-compose up --build
-```
+bash pip install -r requirements.txt uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 
 
-Открыть: http://localhost:8000
+Открыть:
+http://localhost:8000
 
 ---
 
-## Деплой на Digital Ocean
+## Запуск через Docker (DEV)
 
-```bash
-# 1. На дроплете установить Docker
-apt-get update -y && apt-get install -y docker.io docker-compose
+bash docker-compose up --build 
 
-# 2. Клонировать репозиторий
-git clone https://github.com/<username>/letter-recognition-service.git /opt/app
-cd /opt/app
+Локально:
+http://localhost:8000
 
-# 3. Запустить
-docker-compose up -d --build
-ufw allow 8000/tcp
-```
+Прод:
+https://letter-recognition-service.onrender.com/
 
-Сервис доступен на: http://<IP>:8000
+---
+
+## Деплой
+
+Сервис задеплоен на Render:
+
+https://letter-recognition-service.onrender.com/
+
+Автодеплой происходит из GitHub при push в main.
 
 ---
 
 ## Тест через curl
 
-```bash
-# Health check
-curl http://localhost:8000/health
+bash # Health curl https://letter-recognition-service.onrender.com/health  # Изображение curl -X POST https://letter-recognition-service.onrender.com/predict/image \   -F "file=@my_letter.png"  # Пиксели curl -X POST https://letter-recognition-service.onrender.com/predict \   -H "Content-Type: application/json" \   -d '{"pixels": [0,0,...,255]}' 
 
-# Через изображение
-curl -X POST http://localhost:8000/predict/image \
-  -F "file=@my_letter.png"
+---
 
-# Через массив пикселей
-curl -X POST http://localhost:8000/predict \
-  -H "Content-Type: application/json" \
-  -d '{"pixels": [0,0,...,255]}'
-```
+## Важно
+
+- Убедись, что в коде нет захардкоженного localhost
+- Render использует переменную $PORT
+
+Пример запуска:
+bash uvicorn app.main:app --host 0.0.0.0 --port $PORT 
+
+- Если фронт отдельно — настрой CORS
+
+---
+
+## TODO
+
+- [ ] Улучшить точность модели
+- [ ] Добавить поддержку строчных букв
+- [ ] Добавить batch inference
+- [ ] Задеплоить фронт отдельно (например, Vercel)
+
+---
