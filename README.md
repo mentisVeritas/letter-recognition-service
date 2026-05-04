@@ -126,7 +126,9 @@ https://letter-recognition-service.onrender.com/
 ## Тест через curl
 
 bash # Health curl https://letter-recognition-service.onrender.com/health  # Изображение curl -X
+
 POST https://letter-recognition-service.onrender.com/predict/image \ -F "file=@my_letter.png"  # Пиксели curl -X
+
 POST https://letter-recognition-service.onrender.com/predict \ -H "Content-Type: application/json" \ -d '{"
 pixels": [0,0,...,255]}'
 
